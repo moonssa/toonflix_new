@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:toonflix_new/models/webtoon_detail_model.dart';
 import 'package:toonflix_new/models/webtoon_episode_model.dart';
 import 'package:toonflix_new/services/api_services.dart';
@@ -21,12 +22,48 @@ class DetailScreen extends StatefulWidget {
 class _DetailScreenState extends State<DetailScreen> {
   late Future<WebtoonDetailModel> webtoon;
   late Future<List<WebtoonEpisodeModel>> episodes;
+  late SharedPreferences prefs;
+  final String prefKey = "likedToons";
+  bool isLiked = false;
+
+  Future initPrefs() async {
+    prefs = await SharedPreferences.getInstance();
+    final likedToons = prefs.getStringList(prefKey);
+    if (likedToons != null) {
+      if (likedToons.contains(widget.id) == true) {
+        setState(() {
+          isLiked = true;
+        });
+      }
+    } else {
+      await prefs.setStringList(prefKey, []);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     webtoon = ApiService.getToonById(widget.id);
     episodes = ApiService.getLatestEpisodesById(widget.id);
+    initPrefs();
+  }
+
+  onHeartTap() async {
+    final likedToons = prefs.getStringList(prefKey);
+
+    if (likedToons != null) {
+      if (isLiked) {
+        likedToons.remove(widget.id);
+      } else {
+        likedToons.add(widget.id);
+      }
+
+      await prefs.setStringList(prefKey, likedToons);
+
+      setState(() {
+        isLiked = !isLiked;
+      });
+    }
   }
 
   @override
@@ -42,6 +79,12 @@ class _DetailScreenState extends State<DetailScreen> {
           backgroundColor: Colors.white,
           foregroundColor: Colors.green,
           elevation: 1,
+          actions: [
+            IconButton(
+              onPressed: onHeartTap,
+              icon: Icon(isLiked ? Icons.favorite : Icons.favorite_outline),
+            )
+          ],
         ),
         body: SingleChildScrollView(
           child: Padding(
@@ -103,7 +146,6 @@ class _DetailScreenState extends State<DetailScreen> {
                     return const Text("....");
                   },
                 ),
-                const SizedBox(height: 30),
                 FutureBuilder(
                   future: episodes,
                   builder: (context, snapshot) {
